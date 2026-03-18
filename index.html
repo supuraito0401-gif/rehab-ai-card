@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>リハAIカルテ</title>
+
+<style>
+body{background:#121212;color:#e0e0e0;font-family:sans-serif;padding:16px;}
+.container{max-width:700px;margin:auto;}
+
+input,textarea{
+ width:100%;padding:10px;margin-bottom:10px;
+ background:#1e1e1e;border:1px solid #333;color:white;border-radius:6px;
+}
+
+button{
+ width:100%;padding:10px;margin-top:6px;
+ background:#2a2a2a;border:none;color:white;border-radius:6px;
+}
+.primary{background:#4da3ff;}
+
+.card{
+ background:#1e1e1e;padding:10px;margin:10px 0;border-radius:6px;
+}
+
+.section{margin-bottom:10px;}
+.title{font-weight:bold;margin-bottom:4px;}
+
+.small{font-size:12px;color:#aaa;}
+
+#loading{display:none;text-align:center;color:#4da3ff;}
+</style>
+</head>
+
+<body>
+<div class="container">
+
+<h2>リハAIカルテ</h2>
+
+<input id="patientName" placeholder="患者名">
+<div id="date"></div>
+
+<textarea id="subjective" placeholder="S（主訴）"></textarea>
+
+<h4>実施内容</h4>
+<div id="treatments"></div>
+
+<button onclick="startRecording()">録音開始</button>
+<button onclick="stopRecording()">停止</button>
+
+<textarea id="voiceInput" placeholder="音声入力"></textarea>
+<textarea id="manualO" placeholder="O追記"></textarea>
+
+<button class="primary" onclick="generateSOAP()">AI生成</button>
+
+<div id="loading">生成中...</div>
+
+<div id="output"></div>
+
+<button onclick="saveRecord()">保存</button>
+
+<h3>患者一覧</h3>
+<div id="patients"></div>
+
+<h3>カルテ一覧</h3>
+<div id="records"></div>
+
+</div>
+
+<script>
+const today=new Date().toLocaleDateString();
+date.textContent=today;
+
+// リハ項目
+const rehabList=[
+"ROM訓練","筋力強化訓練","ストレッチ","歩行訓練",
+"バランス訓練","立ち上がり訓練","ADL訓練",
+"神経筋再教育","物理療法","リラクゼーション","関節モビ"
+];
+
+rehabList.forEach(r=>{
+ treatments.innerHTML+=`<label><input type="checkbox" value="${r}"> ${r}</label><br>`;
+});
+
+// 音声
+let recognition;
+if('webkitSpeechRecognition'in window){
+ recognition=new webkitSpeechRecognition();
+ recognition.lang='ja-JP';
+ recognition.continuous=true;
+ recognition.onresult=e=>{
+  let t="";
+  for(let i=e.resultIndex;i<e.results.length;i++){
+   t+=e.results[i][0].transcript;
+  }
+  voiceInput.value=t;
+ };
+}
+function startRecording(){recognition.start();}
+function stopRecording(){recognition.stop();}
+
+// AI生成
+function generateSOAP(){
+ loading.style.display="block";
+
+ setTimeout(()=>{
+  let name=patientName.value;
+  let S=subjective.value;
+  let voice=voiceInput.value;
+  let manual=manualO.value;
+
+  let selected=[...document.querySelectorAll("input[type=checkbox]:checked")].map(c=>c.value);
+
+  let O=selected.join("、")+"を実施。";
+
+  if(voice.includes("膝")) O+="膝関節アプローチ。";
+  if(voice.includes("筋緊張")) O+="筋緊張高値。";
+  if(voice.includes("曲が")) O+="可動域改善。";
+
+  if(manual) O+=manual;
+
+  let A="機能改善傾向だが課題残存。";
+  let P="現行プログラム継続。";
+
+  let summary=O.slice(0,30);
+
+  output.innerHTML=`
+  <div class="card">
+    <div class="section"><div class="title">S</div>${S}</div>
+    <div class="section"><div class="title">O</div>${O}</div>
+    <div class="section"><div class="title">A</div>${A}</div>
+    <div class="section"><div class="title">P</div>${P}</div>
+  </div>
+  `;
+
+  output.dataset.summary=summary;
+
+  loading.style.display="none";
+ },1000);
+}
+
+// 保存
+function saveRecord(){
+ let records=JSON.parse(localStorage.getItem("records")||"[]");
+ let patientsList=JSON.parse(localStorage.getItem("patients")||"[]");
+
+ let name=patientName.value;
+
+ if(!patientsList.includes(name)){
+  patientsList.push(name);
+  localStorage.setItem("patients",JSON.stringify(patientsList));
+ }
+
+ records.push({
+  name,
+  date:today,
+  summary:output.dataset.summary,
+  full:output.innerHTML
+ });
+
+ localStorage.setItem("records",JSON.stringify(records));
+ render();
+}
+
+// 表示
+function render(){
+ let records=JSON.parse(localStorage.getItem("records")||"[]");
+ let patientsList=JSON.parse(localStorage.getItem("patients")||"[]");
+
+ patients.innerHTML="";
+ patientsList.forEach(p=>{
+  patients.innerHTML+=`<div class="card" onclick="showPatient('${p}')">${p}</div>`;
+ });
+
+ records.innerHTML="";
+}
+
+function showPatient(name){
+ let records=JSON.parse(localStorage.getItem("records")||"[]");
+
+ let filtered=records.filter(r=>r.name===name);
+
+ let html="";
+ filtered.forEach((r,i)=>{
+  html+=`
+  <div class="card">
+    <div class="small">${r.date}</div>
+    <div>${r.summary}</div>
+    <button onclick="showDetail(${i},'${name}')">詳細</button>
+  </div>
+  `;
+ });
+
+ recordsDiv= document.getElementById("records");
+ recordsDiv.innerHTML=html;
+}
+
+function showDetail(i,name){
+ let records=JSON.parse(localStorage.getItem("records")||"[]");
+ let filtered=records.filter(r=>r.name===name);
+ alert("詳細表示の代わりにここで展開も可");
+}
+
+render();
+</script>
+
+</body>
+</html>
