@@ -6,37 +6,99 @@
 <title>リハAIカルテ</title>
 
 <style>
-body{background:#121212;color:#e0e0e0;font-family:sans-serif;margin:0;}
-.container{padding:16px;max-width:700px;margin:auto;}
+body{
+ background:#121212;
+ color:#e0e0e0;
+ font-family:sans-serif;
+ margin:0;
+}
 
-.header{display:flex;justify-content:space-between;align-items:center;}
-.menu-btn{font-size:24px;cursor:pointer;}
+.container{
+ padding:16px;
+ max-width:600px;
+ margin:auto;
+}
+
+.header{
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+}
+
+.menu-btn{
+ font-size:24px;
+ cursor:pointer;
+}
 
 .menu{
- position:fixed;top:0;left:-250px;width:250px;height:100%;
- background:#1e1e1e;padding:16px;transition:0.3s;
+ position:fixed;
+ top:0;
+ left:-260px;
+ width:260px;
+ height:100%;
+ background:#1e1e1e;
+ padding:16px;
+ transition:0.3s;
+ z-index:1000;
 }
-.menu.open{left:0;}
+
+.menu.open{
+ left:0;
+}
 
 input,textarea,select{
- width:100%;padding:10px;margin-bottom:10px;
- background:#1e1e1e;border:1px solid #333;color:white;border-radius:6px;
+ width:100%;
+ padding:12px;
+ margin-bottom:12px;
+ background:#1e1e1e;
+ border:1px solid #333;
+ color:white;
+ border-radius:8px;
+ font-size:16px;
 }
 
 button{
- width:100%;padding:10px;margin-top:6px;
- background:#2a2a2a;border:none;color:white;border-radius:6px;
+ width:100%;
+ padding:12px;
+ margin-top:8px;
+ background:#2a2a2a;
+ border:none;
+ color:white;
+ border-radius:8px;
+ font-size:16px;
 }
-.primary{background:#4da3ff;}
+
+.primary{
+ background:#3a8cff;
+}
 
 .card{
- background:#1e1e1e;padding:10px;margin:10px 0;border-radius:6px;
+ background:#1e1e1e;
+ padding:12px;
+ margin:12px 0;
+ border-radius:8px;
 }
 
-.small{font-size:12px;color:#aaa;}
+.small{
+ font-size:12px;
+ color:#aaa;
+}
 
 .rehab-item{
- display:flex;justify-content:space-between;margin-bottom:6px;
+ display:flex;
+ align-items:center;
+ gap:10px;
+ padding:8px 0;
+ border-bottom:1px solid #2a2a2a;
+}
+
+.rehab-item span{
+ white-space:nowrap;
+}
+
+.rehab-item input{
+ width:20px;
+ height:20px;
 }
 </style>
 </head>
@@ -45,7 +107,7 @@ button{
 
 <div class="menu" id="menu">
 <h3>検索</h3>
-<input id="search" placeholder="患者名">
+<input id="search" placeholder="患者名で検索">
 <button onclick="render()">全件表示</button>
 </div>
 
@@ -72,10 +134,7 @@ button{
 <h4>実施内容</h4>
 <div id="treatments"></div>
 
-<button onclick="startRecording()">録音開始</button>
-<button onclick="stopRecording()">停止</button>
-
-<textarea id="voiceInput"></textarea>
+<textarea id="voiceInput" placeholder="音声 or 入力（Oベース）"></textarea>
 <textarea id="manualO" placeholder="O追記"></textarea>
 
 <button class="primary" onclick="generateSOAP()">AI生成</button>
@@ -106,15 +165,15 @@ const rehabList=[
 "立ち上がり","ADL訓練","神経筋再教育","物理療法","リラクゼーション","関節モビ"
 ];
 
-rehabList.forEach((r,i)=>{
+rehabList.forEach(r=>{
  treatments.innerHTML+=`
  <div class="rehab-item">
-  <span>${r}</span>
-  <input type="checkbox" value="${r}">
+   <input type="checkbox" value="${r}">
+   <span>${r}</span>
  </div>`;
 });
 
-// ダミー生成
+// AI風生成
 function generateSOAP(){
  let name=patientName.value;
  let therapistVal=therapist.value;
@@ -136,10 +195,10 @@ function generateSOAP(){
  output.innerHTML=`
  <div class="card">
  <div class="small">${name} / ${therapistVal} / ${today}</div>
- <div><b>S</b>: ${S}</div>
- <div><b>O</b>: ${O}</div>
- <div><b>A</b>: ${A}</div>
- <div><b>P</b>: ${P}</div>
+ <div contenteditable="true"><b>S</b>: ${S}</div>
+ <div contenteditable="true"><b>O</b>: ${O}</div>
+ <div contenteditable="true"><b>A</b>: ${A}</div>
+ <div contenteditable="true"><b>P</b>: ${P}</div>
  </div>
  `;
 
@@ -187,7 +246,7 @@ function render(){
  records.innerHTML="";
 }
 
-// 患者別
+// 患者別表示
 function showPatient(name){
  let recordsData=JSON.parse(localStorage.getItem("records")||"[]");
 
@@ -206,7 +265,7 @@ function showPatient(name){
  records.innerHTML=html;
 }
 
-// 🔥 修正ポイント
+// 詳細表示（修正済み）
 function showDetail(index){
  let recordsData=JSON.parse(localStorage.getItem("records")||"[]");
  let record=recordsData[index];
