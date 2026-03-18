@@ -9,32 +9,15 @@
 body{
  background:#0f172a;
  color:#e5e7eb;
- font-family:-apple-system, BlinkMacSystemFont;
+ font-family:-apple-system;
  margin:0;
 }
 
-.container{
- padding:16px;
- max-width:600px;
- margin:auto;
-}
-
-.header{
- display:flex;
- justify-content:space-between;
- align-items:center;
- margin-bottom:10px;
-}
-
-.menu-btn{
- font-size:26px;
- cursor:pointer;
-}
-
+/* 👇 完全に隠す */
 .menu{
  position:fixed;
  top:0;
- left:-260px;
+ left:-100%;
  width:260px;
  height:100%;
  background:#111827;
@@ -62,6 +45,23 @@ body{
  display:block;
 }
 
+.container{
+ padding:16px;
+ max-width:600px;
+ margin:auto;
+}
+
+.header{
+ display:flex;
+ justify-content:space-between;
+ align-items:center;
+}
+
+.menu-btn{
+ font-size:26px;
+ cursor:pointer;
+}
+
 input,textarea,select{
  width:100%;
  padding:12px;
@@ -81,12 +81,12 @@ button{
  border:none;
  color:white;
  border-radius:10px;
- font-size:16px;
 }
 
-.primary{
- background:#2563eb;
-}
+.primary{background:#2563eb;}
+.save{background:#10b981;}
+.delete{background:#ef4444;}
+.edit{background:#f59e0b;}
 
 .card{
  background:#1f2937;
@@ -103,7 +103,7 @@ button{
 .rehab-item{
  display:flex;
  align-items:center;
- gap:12px;
+ gap:10px;
  padding:10px 0;
  border-bottom:1px solid #374151;
 }
@@ -111,17 +111,6 @@ button{
 .rehab-item input{
  width:20px;
  height:20px;
-}
-
-.rehab-item span{
- font-size:14px;
-}
-
-.record-btn{
- background:#10b981;
-}
-.stop-btn{
- background:#ef4444;
 }
 </style>
 </head>
@@ -159,18 +148,15 @@ button{
 <h4>実施内容</h4>
 <div id="treatments"></div>
 
-<h4>音声入力</h4>
-<button class="record-btn" onclick="startRecording()">録音開始</button>
-<button class="stop-btn" onclick="stopRecording()">停止</button>
-
-<textarea id="voiceInput" placeholder="音声結果"></textarea>
+<textarea id="voiceInput" placeholder="音声 or 入力"></textarea>
 <textarea id="manualO" placeholder="O追記"></textarea>
 
 <button class="primary" onclick="generateSOAP()">AI生成</button>
 
 <div id="output"></div>
 
-<button onclick="saveRecord()">保存</button>
+<button class="save" onclick="saveRecord()">保存</button>
+<div id="status"></div>
 
 <h3>患者一覧</h3>
 <div id="patients"></div>
@@ -184,7 +170,6 @@ button{
 const today=new Date().toLocaleDateString();
 date.textContent=today;
 
-// メニュー
 function openMenu(){
  menu.classList.add("open");
  overlay.classList.add("show");
@@ -194,11 +179,7 @@ function closeMenu(){
  overlay.classList.remove("show");
 }
 
-// リハ項目
-const rehabList=[
-"ROM訓練","筋力強化","ストレッチ","歩行訓練","バランス訓練",
-"立ち上がり","ADL訓練","神経筋再教育","物理療法","リラクゼーション","関節モビ"
-];
+const rehabList=["ROM訓練","筋力強化","ストレッチ","歩行訓練","バランス訓練","立ち上がり","ADL訓練","神経筋再教育","物理療法","リラクゼーション","関節モビ"];
 
 rehabList.forEach(r=>{
  treatments.innerHTML+=`
@@ -208,28 +189,6 @@ rehabList.forEach(r=>{
  </div>`;
 });
 
-// 🎤 音声入力
-let recognition;
-
-function startRecording(){
- if(!('webkitSpeechRecognition' in window)){
-  alert("このブラウザは非対応");
-  return;
- }
- recognition=new webkitSpeechRecognition();
- recognition.lang='ja-JP';
- recognition.start();
-
- recognition.onresult=(e)=>{
-  voiceInput.value=e.results[0][0].transcript;
- };
-}
-
-function stopRecording(){
- if(recognition) recognition.stop();
-}
-
-// AI風生成
 function generateSOAP(){
  let name=patientName.value;
  let therapistVal=therapist.value;
@@ -240,7 +199,7 @@ function generateSOAP(){
  let selected=[...document.querySelectorAll("input[type=checkbox]:checked")].map(c=>c.value);
 
  let O=selected.join("、")+"実施。";
- if(voice.includes("膝")) O+="膝関節アプローチ。";
+ if(voice.includes("膝")) O+="膝アプローチ。";
  if(manual) O+=manual;
 
  let A="改善傾向あり。";
@@ -262,74 +221,61 @@ function generateSOAP(){
 
 // 保存
 function saveRecord(){
- let records=JSON.parse(localStorage.getItem("records")||"[]");
- let patientsList=JSON.parse(localStorage.getItem("patients")||"[]");
+ status.textContent="保存中...";
 
- let name=patientName.value;
- let therapistVal=therapist.value;
+ setTimeout(()=>{
+  let records=JSON.parse(localStorage.getItem("records")||"[]");
+  let name=patientName.value;
 
- if(!patientsList.includes(name)){
-  patientsList.push(name);
-  localStorage.setItem("patients",JSON.stringify(patientsList));
- }
+  records.push({
+   name,
+   date:today,
+   summary:output.dataset.summary,
+   full:output.innerHTML
+  });
 
- records.push({
-  name,
-  therapist:therapistVal,
-  date:today,
-  summary:output.dataset.summary,
-  full:output.innerHTML
- });
+  localStorage.setItem("records",JSON.stringify(records));
 
- localStorage.setItem("records",JSON.stringify(records));
- render();
+  status.textContent="保存完了";
+  render();
+ },500);
 }
 
 // 表示
 function render(){
  let recordsData=JSON.parse(localStorage.getItem("records")||"[]");
- let patientsList=JSON.parse(localStorage.getItem("patients")||"[]");
- let keyword=search.value||"";
-
- patients.innerHTML="";
- patientsList.forEach(p=>{
-  if(p.includes(keyword)){
-   patients.innerHTML+=`<div class="card" onclick="showPatient('${p}')">${p}</div>`;
-  }
- });
 
  records.innerHTML="";
-}
-
-// 患者別
-function showPatient(name){
- let recordsData=JSON.parse(localStorage.getItem("records")||"[]");
-
- let html="";
  recordsData.forEach((r,i)=>{
-  if(r.name===name){
-   html+=`
-   <div class="card">
-    <div class="small">${r.date} / ${r.therapist}</div>
+  records.innerHTML+=`
+  <div class="card">
+    <div class="small">${r.date}</div>
     <div>${r.summary}</div>
     <button onclick="showDetail(${i})">詳細</button>
-   </div>`;
-  }
+    <button class="edit" onclick="editRecord(${i})">編集</button>
+    <button class="delete" onclick="deleteRecord(${i})">削除</button>
+  </div>`;
  });
-
- records.innerHTML=html;
 }
 
 // 詳細
-function showDetail(index){
- let recordsData=JSON.parse(localStorage.getItem("records")||"[]");
- let record=recordsData[index];
+function showDetail(i){
+ let data=JSON.parse(localStorage.getItem("records"));
+ records.innerHTML=`<div class="card">${data[i].full}</div>`;
+}
 
- records.innerHTML=`
- <div class="card">
-   ${record.full}
- </div>
- `;
+// 削除
+function deleteRecord(i){
+ let data=JSON.parse(localStorage.getItem("records"));
+ data.splice(i,1);
+ localStorage.setItem("records",JSON.stringify(data));
+ render();
+}
+
+// 編集
+function editRecord(i){
+ let data=JSON.parse(localStorage.getItem("records"));
+ output.innerHTML=data[i].full;
 }
 
 render();
