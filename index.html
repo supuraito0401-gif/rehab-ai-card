@@ -7,9 +7,9 @@
 
 <style>
 body{
- background:#121212;
- color:#e0e0e0;
- font-family:sans-serif;
+ background:#0f172a;
+ color:#e5e7eb;
+ font-family:-apple-system, BlinkMacSystemFont;
  margin:0;
 }
 
@@ -23,10 +23,11 @@ body{
  display:flex;
  justify-content:space-between;
  align-items:center;
+ margin-bottom:10px;
 }
 
 .menu-btn{
- font-size:24px;
+ font-size:26px;
  cursor:pointer;
 }
 
@@ -36,7 +37,7 @@ body{
  left:-260px;
  width:260px;
  height:100%;
- background:#1e1e1e;
+ background:#111827;
  padding:16px;
  transition:0.3s;
  z-index:1000;
@@ -46,14 +47,29 @@ body{
  left:0;
 }
 
+.overlay{
+ position:fixed;
+ top:0;
+ left:0;
+ width:100%;
+ height:100%;
+ background:rgba(0,0,0,0.5);
+ display:none;
+ z-index:999;
+}
+
+.overlay.show{
+ display:block;
+}
+
 input,textarea,select{
  width:100%;
  padding:12px;
  margin-bottom:12px;
- background:#1e1e1e;
- border:1px solid #333;
+ background:#1f2933;
+ border:none;
  color:white;
- border-radius:8px;
+ border-radius:10px;
  font-size:16px;
 }
 
@@ -61,60 +77,69 @@ button{
  width:100%;
  padding:12px;
  margin-top:8px;
- background:#2a2a2a;
+ background:#374151;
  border:none;
  color:white;
- border-radius:8px;
+ border-radius:10px;
  font-size:16px;
 }
 
 .primary{
- background:#3a8cff;
+ background:#2563eb;
 }
 
 .card{
- background:#1e1e1e;
+ background:#1f2937;
  padding:12px;
  margin:12px 0;
- border-radius:8px;
+ border-radius:10px;
 }
 
 .small{
  font-size:12px;
- color:#aaa;
+ color:#9ca3af;
 }
 
 .rehab-item{
  display:flex;
  align-items:center;
- gap:10px;
- padding:8px 0;
- border-bottom:1px solid #2a2a2a;
-}
-
-.rehab-item span{
- white-space:nowrap;
+ gap:12px;
+ padding:10px 0;
+ border-bottom:1px solid #374151;
 }
 
 .rehab-item input{
  width:20px;
  height:20px;
 }
+
+.rehab-item span{
+ font-size:14px;
+}
+
+.record-btn{
+ background:#10b981;
+}
+.stop-btn{
+ background:#ef4444;
+}
 </style>
 </head>
 
 <body>
 
+<div class="overlay" id="overlay" onclick="closeMenu()"></div>
+
 <div class="menu" id="menu">
 <h3>検索</h3>
-<input id="search" placeholder="患者名で検索">
-<button onclick="render()">全件表示</button>
+<input id="search" placeholder="患者名">
+<button onclick="render();closeMenu()">全件表示</button>
 </div>
 
 <div class="container">
 
 <div class="header">
-<div class="menu-btn" onclick="toggleMenu()">☰</div>
+<div class="menu-btn" onclick="openMenu()">☰</div>
 <h2>リハAIカルテ</h2>
 </div>
 
@@ -134,7 +159,11 @@ button{
 <h4>実施内容</h4>
 <div id="treatments"></div>
 
-<textarea id="voiceInput" placeholder="音声 or 入力（Oベース）"></textarea>
+<h4>音声入力</h4>
+<button class="record-btn" onclick="startRecording()">録音開始</button>
+<button class="stop-btn" onclick="stopRecording()">停止</button>
+
+<textarea id="voiceInput" placeholder="音声結果"></textarea>
 <textarea id="manualO" placeholder="O追記"></textarea>
 
 <button class="primary" onclick="generateSOAP()">AI生成</button>
@@ -155,8 +184,14 @@ button{
 const today=new Date().toLocaleDateString();
 date.textContent=today;
 
-function toggleMenu(){
- menu.classList.toggle("open");
+// メニュー
+function openMenu(){
+ menu.classList.add("open");
+ overlay.classList.add("show");
+}
+function closeMenu(){
+ menu.classList.remove("open");
+ overlay.classList.remove("show");
 }
 
 // リハ項目
@@ -172,6 +207,27 @@ rehabList.forEach(r=>{
    <span>${r}</span>
  </div>`;
 });
+
+// 🎤 音声入力
+let recognition;
+
+function startRecording(){
+ if(!('webkitSpeechRecognition' in window)){
+  alert("このブラウザは非対応");
+  return;
+ }
+ recognition=new webkitSpeechRecognition();
+ recognition.lang='ja-JP';
+ recognition.start();
+
+ recognition.onresult=(e)=>{
+  voiceInput.value=e.results[0][0].transcript;
+ };
+}
+
+function stopRecording(){
+ if(recognition) recognition.stop();
+}
 
 // AI風生成
 function generateSOAP(){
@@ -201,7 +257,6 @@ function generateSOAP(){
  <div contenteditable="true"><b>P</b>: ${P}</div>
  </div>
  `;
-
  output.dataset.summary=summary;
 }
 
@@ -246,7 +301,7 @@ function render(){
  records.innerHTML="";
 }
 
-// 患者別表示
+// 患者別
 function showPatient(name){
  let recordsData=JSON.parse(localStorage.getItem("records")||"[]");
 
@@ -265,7 +320,7 @@ function showPatient(name){
  records.innerHTML=html;
 }
 
-// 詳細表示（修正済み）
+// 詳細
 function showDetail(index){
  let recordsData=JSON.parse(localStorage.getItem("records")||"[]");
  let record=recordsData[index];
