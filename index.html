@@ -13,7 +13,6 @@ body{
  margin:0;
 }
 
-/* 👇 完全に隠す */
 .menu{
  position:fixed;
  top:0;
@@ -25,10 +24,7 @@ body{
  transition:0.3s;
  z-index:1000;
 }
-
-.menu.open{
- left:0;
-}
+.menu.open{left:0;}
 
 .overlay{
  position:fixed;
@@ -40,10 +36,7 @@ body{
  display:none;
  z-index:999;
 }
-
-.overlay.show{
- display:block;
-}
+.overlay.show{display:block;}
 
 .container{
  padding:16px;
@@ -76,7 +69,7 @@ input,textarea,select{
 button{
  width:100%;
  padding:12px;
- margin-top:8px;
+ margin-top:6px;
  background:#374151;
  border:none;
  color:white;
@@ -107,11 +100,6 @@ button{
  padding:10px 0;
  border-bottom:1px solid #374151;
 }
-
-.rehab-item input{
- width:20px;
- height:20px;
-}
 </style>
 </head>
 
@@ -121,7 +109,7 @@ button{
 
 <div class="menu" id="menu">
 <h3>検索</h3>
-<input id="search" placeholder="患者名">
+<input id="search" placeholder="患者名検索">
 <button onclick="render();closeMenu()">全件表示</button>
 </div>
 
@@ -148,7 +136,7 @@ button{
 <h4>実施内容</h4>
 <div id="treatments"></div>
 
-<textarea id="voiceInput" placeholder="音声 or 入力"></textarea>
+<textarea id="voiceInput" placeholder="音声・入力"></textarea>
 <textarea id="manualO" placeholder="O追記"></textarea>
 
 <button class="primary" onclick="generateSOAP()">AI生成</button>
@@ -170,6 +158,7 @@ button{
 const today=new Date().toLocaleDateString();
 date.textContent=today;
 
+// メニュー
 function openMenu(){
  menu.classList.add("open");
  overlay.classList.add("show");
@@ -179,7 +168,11 @@ function closeMenu(){
  overlay.classList.remove("show");
 }
 
-const rehabList=["ROM訓練","筋力強化","ストレッチ","歩行訓練","バランス訓練","立ち上がり","ADL訓練","神経筋再教育","物理療法","リラクゼーション","関節モビ"];
+// リハ項目
+const rehabList=[
+"ROM訓練","筋力強化","ストレッチ","歩行訓練","バランス訓練",
+"立ち上がり","ADL訓練","神経筋再教育","物理療法","リラクゼーション","関節モビ"
+];
 
 rehabList.forEach(r=>{
  treatments.innerHTML+=`
@@ -189,6 +182,7 @@ rehabList.forEach(r=>{
  </div>`;
 });
 
+// AI風生成
 function generateSOAP(){
  let name=patientName.value;
  let therapistVal=therapist.value;
@@ -225,10 +219,10 @@ function saveRecord(){
 
  setTimeout(()=>{
   let records=JSON.parse(localStorage.getItem("records")||"[]");
-  let name=patientName.value;
 
   records.push({
-   name,
+   name:patientName.value,
+   therapist:therapist.value,
    date:today,
    summary:output.dataset.summary,
    full:output.innerHTML
@@ -241,19 +235,45 @@ function saveRecord(){
  },500);
 }
 
-// 表示
-function render(){
+// 患者一覧
+function renderPatients(){
+ let recordsData = JSON.parse(localStorage.getItem("records")||"[]");
+
+ let patientsList = [...new Set(recordsData.map(r=>r.name))];
+
+ let keyword=search.value||"";
+
+ patients.innerHTML="";
+
+ patientsList.forEach(name=>{
+  if(name.includes(keyword)){
+   patients.innerHTML+=`
+   <div class="card" onclick="showPatient('${name}')">
+     ${name}
+   </div>`;
+  }
+ });
+}
+
+// 患者ごとカルテ
+function showPatient(name){
  let recordsData=JSON.parse(localStorage.getItem("records")||"[]");
 
+ let filtered=recordsData.filter(r=>r.name===name);
+
  records.innerHTML="";
- recordsData.forEach((r,i)=>{
+
+ filtered.forEach((r,i)=>{
+  let index=recordsData.indexOf(r);
+
   records.innerHTML+=`
   <div class="card">
-    <div class="small">${r.date}</div>
+    <div class="small">${r.date} / ${r.therapist}</div>
     <div>${r.summary}</div>
-    <button onclick="showDetail(${i})">詳細</button>
-    <button class="edit" onclick="editRecord(${i})">編集</button>
-    <button class="delete" onclick="deleteRecord(${i})">削除</button>
+
+    <button onclick="showDetail(${index})">詳細</button>
+    <button class="edit" onclick="editRecord(${index})">編集</button>
+    <button class="delete" onclick="deleteRecord(${index})">削除</button>
   </div>`;
  });
 }
@@ -276,6 +296,12 @@ function deleteRecord(i){
 function editRecord(i){
  let data=JSON.parse(localStorage.getItem("records"));
  output.innerHTML=data[i].full;
+}
+
+// 全体描画
+function render(){
+ renderPatients();
+ records.innerHTML="";
 }
 
 render();
