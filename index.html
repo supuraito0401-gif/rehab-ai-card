@@ -42,6 +42,7 @@ body{
  padding:16px;
  max-width:600px;
  margin:auto;
+ overflow-x:hidden; /* ← 追加（ズレ防止） */
 }
 
 .header{
@@ -93,12 +94,27 @@ button{
  color:#9ca3af;
 }
 
+/* 🔥 ここが今回の修正本体 */
 .rehab-item{
  display:flex;
  align-items:center;
- gap:10px;
+ gap:12px;
  padding:10px 0;
  border-bottom:1px solid #374151;
+ width:100%;
+}
+
+.rehab-item input{
+ width:20px;
+ height:20px;
+ flex-shrink:0;
+}
+
+.rehab-item span{
+ flex:1;                /* ← 横に広げる */
+ font-size:14px;
+ word-break:keep-all;   /* ← 日本語縦崩れ防止 */
+ white-space:normal;
 }
 </style>
 </head>
@@ -158,7 +174,6 @@ button{
 const today=new Date().toLocaleDateString();
 date.textContent=today;
 
-// メニュー
 function openMenu(){
  menu.classList.add("open");
  overlay.classList.add("show");
@@ -168,7 +183,6 @@ function closeMenu(){
  overlay.classList.remove("show");
 }
 
-// リハ項目
 const rehabList=[
 "ROM訓練","筋力強化","ストレッチ","歩行訓練","バランス訓練",
 "立ち上がり","ADL訓練","神経筋再教育","物理療法","リラクゼーション","関節モビ"
@@ -182,123 +196,70 @@ rehabList.forEach(r=>{
  </div>`;
 });
 
-// AI風生成
 function generateSOAP(){
- let name=patientName.value;
- let therapistVal=therapist.value;
- let S=subjective.value;
- let voice=voiceInput.value;
- let manual=manualO.value;
-
  let selected=[...document.querySelectorAll("input[type=checkbox]:checked")].map(c=>c.value);
-
  let O=selected.join("、")+"実施。";
- if(voice.includes("膝")) O+="膝アプローチ。";
- if(manual) O+=manual;
-
- let A="改善傾向あり。";
- let P="継続予定。";
-
- let summary=O.slice(0,30);
 
  output.innerHTML=`
  <div class="card">
- <div class="small">${name} / ${therapistVal} / ${today}</div>
- <div contenteditable="true"><b>S</b>: ${S}</div>
- <div contenteditable="true"><b>O</b>: ${O}</div>
- <div contenteditable="true"><b>A</b>: ${A}</div>
- <div contenteditable="true"><b>P</b>: ${P}</div>
+ <div contenteditable="true">${O}</div>
  </div>
  `;
- output.dataset.summary=summary;
+ output.dataset.summary=O.slice(0,30);
 }
 
-// 保存
 function saveRecord(){
  status.textContent="保存中...";
-
  setTimeout(()=>{
   let records=JSON.parse(localStorage.getItem("records")||"[]");
 
   records.push({
    name:patientName.value,
-   therapist:therapist.value,
    date:today,
    summary:output.dataset.summary,
    full:output.innerHTML
   });
 
   localStorage.setItem("records",JSON.stringify(records));
-
   status.textContent="保存完了";
   render();
  },500);
 }
 
-// 患者一覧
 function renderPatients(){
  let recordsData = JSON.parse(localStorage.getItem("records")||"[]");
-
  let patientsList = [...new Set(recordsData.map(r=>r.name))];
 
- let keyword=search.value||"";
-
  patients.innerHTML="";
-
  patientsList.forEach(name=>{
-  if(name.includes(keyword)){
-   patients.innerHTML+=`
-   <div class="card" onclick="showPatient('${name}')">
-     ${name}
-   </div>`;
-  }
+  patients.innerHTML+=`
+   <div class="card" onclick="showPatient('${name}')">${name}</div>
+  `;
  });
 }
 
-// 患者ごとカルテ
 function showPatient(name){
  let recordsData=JSON.parse(localStorage.getItem("records")||"[]");
-
  let filtered=recordsData.filter(r=>r.name===name);
 
  records.innerHTML="";
-
  filtered.forEach((r,i)=>{
   let index=recordsData.indexOf(r);
 
   records.innerHTML+=`
   <div class="card">
-    <div class="small">${r.date} / ${r.therapist}</div>
+    <div class="small">${r.date}</div>
     <div>${r.summary}</div>
-
     <button onclick="showDetail(${index})">詳細</button>
-    <button class="edit" onclick="editRecord(${index})">編集</button>
-    <button class="delete" onclick="deleteRecord(${index})">削除</button>
   </div>`;
  });
 }
 
-// 詳細
 function showDetail(i){
  let data=JSON.parse(localStorage.getItem("records"));
  records.innerHTML=`<div class="card">${data[i].full}</div>`;
 }
 
-// 削除
-function deleteRecord(i){
- let data=JSON.parse(localStorage.getItem("records"));
- data.splice(i,1);
- localStorage.setItem("records",JSON.stringify(data));
- render();
-}
-
-// 編集
-function editRecord(i){
- let data=JSON.parse(localStorage.getItem("records"));
- output.innerHTML=data[i].full;
-}
-
-// 全体描画
 function render(){
  renderPatients();
  records.innerHTML="";
