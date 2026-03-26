@@ -13,47 +13,10 @@ body{
  margin:0;
 }
 
-.menu{
- position:fixed;
- top:0;
- left:-100%;
- width:260px;
- height:100%;
- background:#111827;
- padding:16px;
- transition:0.3s;
- z-index:1000;
-}
-.menu.open{left:0;}
-
-.overlay{
- position:fixed;
- top:0;
- left:0;
- width:100%;
- height:100%;
- background:rgba(0,0,0,0.5);
- display:none;
- z-index:999;
-}
-.overlay.show{display:block;}
-
 .container{
  padding:16px;
  max-width:600px;
  margin:auto;
- overflow-x:hidden; /* ← 追加（ズレ防止） */
-}
-
-.header{
- display:flex;
- justify-content:space-between;
- align-items:center;
-}
-
-.menu-btn{
- font-size:26px;
- cursor:pointer;
 }
 
 input,textarea,select{
@@ -64,208 +27,166 @@ input,textarea,select{
  border:none;
  color:white;
  border-radius:10px;
- font-size:16px;
 }
 
 button{
  width:100%;
  padding:12px;
  margin-top:6px;
- background:#374151;
  border:none;
- color:white;
  border-radius:10px;
+ color:white;
+ background:#374151;
 }
 
 .primary{background:#2563eb;}
-.save{background:#10b981;}
-.delete{background:#ef4444;}
-.edit{background:#f59e0b;}
+.record{background:#ef4444;}
 
 .card{
  background:#1f2937;
  padding:12px;
- margin:12px 0;
  border-radius:10px;
+ margin-top:12px;
 }
 
-.small{
- font-size:12px;
- color:#9ca3af;
-}
-
-/* 🔥 ここが今回の修正本体 */
 .rehab-item{
  display:flex;
- align-items:center;
- gap:12px;
- padding:10px 0;
- border-bottom:1px solid #374151;
- width:100%;
-}
-
-.rehab-item input{
- width:20px;
- height:20px;
- flex-shrink:0;
-}
-
-.rehab-item span{
- flex:1;                /* ← 横に広げる */
- font-size:14px;
- word-break:keep-all;   /* ← 日本語縦崩れ防止 */
- white-space:normal;
+ gap:10px;
+ padding:8px 0;
 }
 </style>
 </head>
 
 <body>
 
-<div class="overlay" id="overlay" onclick="closeMenu()"></div>
-
-<div class="menu" id="menu">
-<h3>検索</h3>
-<input id="search" placeholder="患者名検索">
-<button onclick="render();closeMenu()">全件表示</button>
-</div>
-
 <div class="container">
 
-<div class="header">
-<div class="menu-btn" onclick="openMenu()">☰</div>
-<h2>リハAIカルテ</h2>
-</div>
+<h2>リハAIカルテ（音声×雛形）</h2>
 
 <input id="patientName" placeholder="患者名">
 
-<select id="therapist">
-<option value="">実施者選択</option>
-<option>田中</option>
-<option>佐藤</option>
-<option>山本</option>
+<select id="disease">
+<option value="">疾患選択</option>
+<option>膝OA</option>
+<option>腰痛</option>
+<option>脳梗塞</option>
 </select>
 
-<div id="date"></div>
-
 <textarea id="subjective" placeholder="S（主訴）"></textarea>
+
+<h4>🎤 音声入力</h4>
+<button class="record" onclick="toggleRecording()">録音開始 / 停止</button>
+<textarea id="voiceText" placeholder="音声結果"></textarea>
 
 <h4>実施内容</h4>
 <div id="treatments"></div>
 
-<textarea id="voiceInput" placeholder="音声・入力"></textarea>
-<textarea id="manualO" placeholder="O追記"></textarea>
-
-<button class="primary" onclick="generateSOAP()">AI生成</button>
+<button class="primary" onclick="generate()">AI生成</button>
 
 <div id="output"></div>
-
-<button class="save" onclick="saveRecord()">保存</button>
-<div id="status"></div>
-
-<h3>患者一覧</h3>
-<div id="patients"></div>
-
-<h3>カルテ一覧</h3>
-<div id="records"></div>
 
 </div>
 
 <script>
-const today=new Date().toLocaleDateString();
-date.textContent=today;
+// 疾患テンプレ
+const templates={
+ "膝OA":{
+  O:"膝関節に疼痛あり。可動域制限を認める。",
+  A:"筋力低下およびROM制限により機能低下。",
+  P:"筋力強化・ROM改善継続。"
+ },
+ "腰痛":{
+  O:"腰部疼痛あり。体幹筋低下。",
+  A:"体幹支持性低下による疼痛持続。",
+  P:"体幹トレーニング継続。"
+ },
+ "脳梗塞":{
+  O:"片麻痺あり。バランス低下。",
+  A:"運動麻痺によりADL制限。",
+  P:"歩行・バランス訓練継続。"
+ }
+};
 
-function openMenu(){
- menu.classList.add("open");
- overlay.classList.add("show");
-}
-function closeMenu(){
- menu.classList.remove("open");
- overlay.classList.remove("show");
-}
-
+// リハ項目
 const rehabList=[
-"ROM訓練","筋力強化","ストレッチ","歩行訓練","バランス訓練",
-"立ち上がり","ADL訓練","神経筋再教育","物理療法","リラクゼーション","関節モビ"
+"ROM訓練","筋力強化","歩行訓練","バランス訓練","ストレッチ","関節モビ"
 ];
 
 rehabList.forEach(r=>{
  treatments.innerHTML+=`
  <div class="rehab-item">
-   <input type="checkbox" value="${r}">
-   <span>${r}</span>
+ <input type="checkbox" value="${r}">
+ <span>${r}</span>
  </div>`;
 });
 
-function generateSOAP(){
+// 音声認識
+let recognition;
+let recording=false;
+
+function toggleRecording(){
+ if(!('webkitSpeechRecognition'in window)){
+  alert("音声未対応");
+  return;
+ }
+
+ if(!recording){
+  recognition=new webkitSpeechRecognition();
+  recognition.lang="ja-JP";
+  recognition.continuous=true;
+
+  recognition.onresult=(e)=>{
+   let text="";
+   for(let i=0;i<e.results.length;i++){
+    text+=e.results[i][0].transcript;
+   }
+   voiceText.value=text;
+  };
+
+  recognition.start();
+  recording=true;
+ }else{
+  recognition.stop();
+  recording=false;
+ }
+}
+
+// 簡易AI（ここがキモ）
+function summarize(text){
+ let result="";
+
+ if(text.includes("膝")) result+="膝関節に関する訴えあり。";
+ if(text.includes("痛")) result+="疼痛あり。";
+ if(text.includes("曲")) result+="可動域改善傾向。";
+ if(text.includes("硬")) result+="筋緊張高い。";
+
+ return result;
+}
+
+// 生成
+function generate(){
+ let disease=diseaseSelect.value;
+ let temp=templates[disease]||{};
+
  let selected=[...document.querySelectorAll("input[type=checkbox]:checked")].map(c=>c.value);
- let O=selected.join("、")+"実施。";
+
+ let voice=voiceText.value;
+ let summary=summarize(voice);
+
+ let O=(temp.O||"")+" "+summary+" "+selected.join("、")+"実施。";
+
+ let A=temp.A||"評価中";
+ let P=temp.P||"継続予定";
 
  output.innerHTML=`
  <div class="card">
- <div contenteditable="true">${O}</div>
+ <div contenteditable="true"><b>S</b>: ${subjective.value}</div>
+ <div contenteditable="true"><b>O</b>: ${O}</div>
+ <div contenteditable="true"><b>A</b>: ${A}</div>
+ <div contenteditable="true"><b>P</b>: ${P}</div>
  </div>
  `;
- output.dataset.summary=O.slice(0,30);
 }
-
-function saveRecord(){
- status.textContent="保存中...";
- setTimeout(()=>{
-  let records=JSON.parse(localStorage.getItem("records")||"[]");
-
-  records.push({
-   name:patientName.value,
-   date:today,
-   summary:output.dataset.summary,
-   full:output.innerHTML
-  });
-
-  localStorage.setItem("records",JSON.stringify(records));
-  status.textContent="保存完了";
-  render();
- },500);
-}
-
-function renderPatients(){
- let recordsData = JSON.parse(localStorage.getItem("records")||"[]");
- let patientsList = [...new Set(recordsData.map(r=>r.name))];
-
- patients.innerHTML="";
- patientsList.forEach(name=>{
-  patients.innerHTML+=`
-   <div class="card" onclick="showPatient('${name}')">${name}</div>
-  `;
- });
-}
-
-function showPatient(name){
- let recordsData=JSON.parse(localStorage.getItem("records")||"[]");
- let filtered=recordsData.filter(r=>r.name===name);
-
- records.innerHTML="";
- filtered.forEach((r,i)=>{
-  let index=recordsData.indexOf(r);
-
-  records.innerHTML+=`
-  <div class="card">
-    <div class="small">${r.date}</div>
-    <div>${r.summary}</div>
-    <button onclick="showDetail(${index})">詳細</button>
-  </div>`;
- });
-}
-
-function showDetail(i){
- let data=JSON.parse(localStorage.getItem("records"));
- records.innerHTML=`<div class="card">${data[i].full}</div>`;
-}
-
-function render(){
- renderPatients();
- records.innerHTML="";
-}
-
-render();
 </script>
 
 </body>
